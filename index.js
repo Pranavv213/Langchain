@@ -1,5 +1,7 @@
 console.log("Hare Krishna")
 
+import express from 'express';
+
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
 import * as dotenv from "dotenv"
@@ -18,40 +20,55 @@ const loader = new PDFLoader("src/langchain.pdf");
 
 const docs = await loader.load();
 
-//splitter function
-const splitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 20,
+const app = express();
+
+const port = 3000; 
+
+
+  
+
+app.get('/:data', async (req, res) => {
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 20,
+  });
+  
+  //splitted chunks
+  const splittedDocs = await splitter.splitDocuments(docs);
+  
+  const openAIApiKey = "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"
+  const embeddings = new OpenAIEmbeddings()
+  
+    const vectorStore = await HNSWLib.fromDocuments(
+     splittedDocs,
+     embeddings
+    );
+  
+   
+  // console.log(splittedDocs)
+  
+  const vectorStoreRetriever = vectorStore.asRetriever();
+  
+  
+  const model = new OpenAI({
+      modelName:'gpt-3.5-turbo'
+  });
+  
+  const chain = RetrievalQAChain.fromLLM(model, vectorStoreRetriever);
+  
+  // console.log(chain)
+  const question=req.params.data
+  
+  const ans=await chain.call({
+    query:question
+  })
+  
+
+  res.send(ans);
 });
 
-//splitted chunks
-const splittedDocs = await splitter.splitDocuments(docs);
-
-const openAIApiKey = "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"
-const embeddings = new OpenAIEmbeddings()
-
-  const vectorStore = await HNSWLib.fromDocuments(
-   splittedDocs,
-   embeddings
-  );
-
- 
-// console.log(splittedDocs)
-
-const vectorStoreRetriever = vectorStore.asRetriever();
-
-
-const model = new OpenAI({
-    modelName:'gpt-3.5-turbo'
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
 
-const chain = RetrievalQAChain.fromLLM(model, vectorStoreRetriever);
-
-// console.log(chain)
-const question="give code for extracting from pdf using document loader "
-
-const ans=await chain.call({
-  query:question
-})
-
-console.log(ans)
